@@ -12,7 +12,9 @@
     "test": "LOG_LEVEL=warn NODE_ENV=test node --import tsx --test --test-timeout=30000 --experimental-test-coverage --test-reporter=spec '__tests__/**/*.test.ts'",
     "docker:up": "COMPOSE_BAKE=true docker compose up --build -d",
     "docker:watch": "COMPOSE_BAKE=true docker compose up --build --watch",
-    "docker:down": "docker compose down --remove-orphans"
+    "docker:down": "docker compose down --remove-orphans",
+    "docker:logs": "docker compose logs -f backend",
+    "docker:health": "docker compose ps"
   },
   "engines": {
     "node": ">=25.0.0"

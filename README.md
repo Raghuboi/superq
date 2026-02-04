@@ -38,6 +38,8 @@ npm install && npm run dev
 | `npm run docker:up` | Start Docker services |
 | `npm run docker:watch` | Docker with hot reload |
 | `npm run docker:down` | Stop Docker services |
+| `npm run docker:logs` | Follow app container logs |
+| `npm run docker:health` | Check service health status |
 
 ---
 
@@ -68,10 +70,20 @@ npm install && npm run dev
 
 ## Extensibility
 
+The service uses a registry pattern for swappable backends:
+
 | Adapter | Description |
 |---------|-------------|
-| **Redis Cache** | Distributed caching for multi-instance deployments |
-| **Inngest Queue** | Durable execution with exactly-once semantics |
+| **Redis Cache** | Distributed caching for horizontal scaling |
+| **Inngest Queue** | Durable execution with exactly-once delivery |
+
+### Adding Custom Adapters
+
+1. Implement `CacheAdapter` or `QueueAdapter` interface
+2. Register in `src/lib/cache/registry.ts` or `src/lib/queue/registry.ts`
+3. Add type to env schema: `z.enum(['memory', 'redis', 'your-adapter'])`
+
+See `src/lib/cache/redis-cache.ts` for reference implementation.
 
 ---
 
@@ -193,7 +205,7 @@ curl -X POST http://localhost:3000/chat \
   -H "Content-Type: application/json" \
   -d '{"text":"redis-test"}'
 
-docker exec superq-redis-1 redis-cli -a stub-redis-password KEYS '*'
+docker exec redis redis-cli -a stub-redis-password KEYS '*'
 ```
 
 ### Inngest Queue (Docker)
@@ -230,8 +242,8 @@ QUEUE_TYPE=inngest INNGEST_EVENT_KEY=key INNGEST_SIGNING_KEY=key \
 
 | Service | Port | Description |
 |---------|------|-------------|
-| `app` | 3000 | Node.js API server |
-| `redis` | 6379 | Redis (optional cache) |
+| `backend` | 3000 | Node.js API server |
+| `redis` | 6379 | Redis (stub password) |
 | `inngest` | 8288 | Inngest dev server |
 
 ---
