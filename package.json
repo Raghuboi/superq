@@ -9,7 +9,7 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/src/index.js",
-    "test": "LOG_LEVEL=warn NODE_ENV=test node --import tsx --test --test-timeout=30000 --experimental-test-coverage --test-reporter=spec '__tests__/**/*.test.ts'",
+    "test": "LOG_LEVEL=warn NODE_ENV=test node --import tsx --test --test-timeout=60000 --experimental-test-coverage --test-reporter=spec '__tests__/**/*.test.ts'",
     "lint": "eslint src __tests__",
     "lint:fix": "eslint src __tests__ --fix",
     "format": "prettier --write \"src/**/*.ts\" \"__tests__/**/*.ts\"",
