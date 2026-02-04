@@ -1,44 +1,27 @@
 # SuperQ
 
-Queue-based SHA-256 hash service with caching and request coalescing.
+**Full Stack Backend Assessment: Queue + Cache Service**
+
+A backend service that:
+1. Processes text requests through a **queue**
+2. Computes **SHA-256 hashes** with a simulated **10-second delay**
+3. Caches results in an **LRU cache** for instant repeat responses
+4. Handles **concurrent clients** via request coalescing (100 requests → 1 computation)
+
+| Requirement | Implementation |
+|-------------|----------------|
+| Queue for processing | `MemoryQueue` (FIFO, 198 lines) |
+| Cache for repeats | `MemoryCache` (LRU, 74 lines) |
+| SHA-256 + 10s delay | `node:crypto` + `node:timers/promises` |
+| Concurrent handling | Request coalescing via Map deduplication |
+| Extensibility | Registry pattern for Redis/Inngest swap |
+
+See [`screenshots/`](screenshots/) for visual verification.
 
 ## Quick Start
 
 ```bash
 npm install && npm run dev
-```
-
-## Test Suite
-
-### Summary
-
-```
-tests 8 | suites 4 | pass 8 | fail 0
-duration_ms 30266.689714
-```
-
-### Coverage
-
-| Metric | Coverage |
-|--------|----------|
-| Line | 94.49% |
-| Branch | 81.45% |
-| Functions | 78.95% |
-
-### Test Batches
-
-| Suite | Tests | Duration |
-|-------|-------|----------|
-| Chat Integration | 3 | 30031ms |
-| Contract Integration | 3 | 25ms |
-| Health Integration | 1 | 10026ms |
-| Stress Integration | 1 | 10032ms |
-
-### Running Tests
-
-```bash
-npm test                    # Run all tests with coverage
-npm run test:watch          # Watch mode (if configured)
 ```
 
 ## API Endpoints
@@ -102,7 +85,7 @@ Response:
 
 ### GET /docs
 
-Swagger UI documentation.
+Swagger UI documentation (also accessible via `/`).
 
 ## Architecture
 
@@ -147,36 +130,159 @@ src/
 **Service** - Business logic, request IDs, cache vs queue routing
 **Repository** - Data access, cache-aside pattern, SHA-256 computation
 
+## Caching Policies
+
+### Available Policies
+
+| Policy | Description | Fit for This Service |
+|--------|-------------|---------------------|
+| **LRU** | Evicts least recently used | ✅ Chosen |
+| LFU | Evicts least frequently used | Complex tracking |
+| FIFO | Evicts oldest items | Ignores access patterns |
+| TTL | Expires after time | Not needed (immutable) |
+
+### Why LRU?
+
+1. **Spec alignment**: "Serve repeat requests instantly" → O(1) Map lookup
+2. **Immutability**: SHA-256 is deterministic—`hash("hello")` always equals `hash("hello")`
+3. **No TTL needed**: Data never goes stale
+4. **Bounded memory**: Controlled via `CACHE_MAX_SIZE`
+
+### Native Map Implementation
+
+LRU uses JavaScript's `Map` insertion-order guarantee:
+
+```typescript
+// O(1) LRU via delete + re-insert
+this.data.delete(key)     // Remove from current position
+this.data.set(key, entry) // Re-insert at end (most recent)
+```
+
+### Redis Extensibility
+
+```bash
+# Enable via environment
+CACHE_TYPE=redis REDIS_URL=redis://... npm run dev
+```
+
+**Docker Verification:**
+
+```bash
+CACHE_TYPE=redis REDIS_URL=redis://:stub-redis-password@redis:6379 \
+  docker compose up --build -d
+
+curl -X POST http://localhost:3000/chat \
+  -H "Content-Type: application/json" \
+  -d '{"text":"redis-test"}'
+
+docker exec superq-redis-1 redis-cli -a stub-redis-password KEYS '*'
+docker compose down
+```
+
+## Queue System
+
+### Current Implementation
+
+Map-based in-memory queue (198 lines):
+
+| Feature | Implementation |
+|---------|----------------|
+| FIFO ordering | `queue.shift()` |
+| Concurrency control | `processing.size >= concurrency` |
+| Request coalescing | `coalescing.get(key)` |
+
+### Competitors Comparison
+
+| Criteria | fastq | BullMQ | Inngest |
+|----------|-------|--------|---------|
+| Type | In-memory | Redis-based | Postgres + Redis |
+| Performance | 866K ops/sec | High throughput | Optimized for reliability |
+| Persistence | ❌ | ✅ Redis | ✅ Postgres |
+| Deduplication | Manual | At-least-once | Exactly-once |
+| TypeScript | ✅ | ✅ | First-class |
+| Concurrency keys | ❌ | Global | Per-key limits |
+| Setup | Zero deps | Redis required | Higher (Postgres) |
+
+### Why Inngest for Production
+
+- **Per-key concurrency limits** for multi-tenant scenarios
+- **Exactly-once semantics** via event ID deduplication
+- **Durable execution** with automatic retries
+- **Full TypeScript SDK** with type inference
+
+**Docker Verification:**
+
+```bash
+QUEUE_TYPE=inngest INNGEST_EVENT_KEY=key INNGEST_SIGNING_KEY=key \
+  docker compose up --build
+# Inngest dev server: http://localhost:8288
+```
+
+## Concurrency & Invalidation
+
+### Node.js Event Loop Model
+
+Operations between `await` points are atomic—no mutex needed:
+
+```typescript
+// SAFE in Node.js (single-threaded):
+const cached = await cache.get(key)  // Atomic lookup
+if (cached) return cached            // No interleaving
+```
+
+### Three Categories (HelloInterview Framework)
+
+| Category | Problem | Our Solution |
+|----------|---------|--------------|
+| Correctness | Check-then-act races | Single-threaded event loop |
+| Coordination | Work flowing between threads | Request coalescing |
+| Scarcity | Limited resource access | Semaphore-style `processing.size` |
+
+### Request Coalescing (Thundering Herd Prevention)
+
+```typescript
+if (coalesceKey) {
+  const existing = this.coalescing.get(coalesceKey)
+  if (existing) {
+    // Attach to existing promise instead of new work
+    return new Promise((resolve) => {
+      existing.resolve = chainResolvers(existing.resolve, resolve)
+    })
+  }
+}
+```
+
+Result: 100 concurrent identical requests → 1 computation, 99 coalesced
+
+### Comparison with Multi-threaded Languages
+
+| Concern | Node.js | Java/Go |
+|---------|---------|---------|
+| Shared state | Atomic between awaits | Requires mutex |
+| Race conditions | Only async gaps | Any concurrent access |
+| Cache consistency | Map ops atomic | ConcurrentHashMap |
+| Deadlock risk | None | Lock ordering issues |
+
+### Trade-offs
+
+| Aspect | Node.js Advantage | Limitation |
+|--------|-------------------|------------|
+| Simplicity | No sync primitives | Single CPU |
+| Correctness | Easy to reason | Blocking freezes all |
+| Scaling | Horizontal (multi-process) | Not vertical |
+
 ## Registry System
 
 ### Design Pattern: Singleton + Factory
 
-Both registries follow the same pattern:
-1. **Lazy initialization** - Adapters created on first access
-2. **Environment-based selection** - `CACHE_TYPE` and `QUEUE_TYPE` env vars
-3. **Test reset capability** - Clear instances between test runs
+1. **Lazy initialization** on first access
+2. **Environment-based** adapter selection
+3. **Test reset capability** for isolation
 
-### Cache Registry (Singleton)
-
-```typescript
-import { getCache, resetCache, clearCache } from './lib/cache'
-
-// Get or create the cache instance
-const cache = getCache()
-
-// Optional: pass config for memory cache
-const cache = getCache({ maxSize: 500 })
-
-// Clear all cached data (preserves instance)
-await clearCache()
-
-// Reset instance (for tests)
-resetCache()
-```
-
-**Internals:**
+### Cache Registry (74 lines total)
 
 ```typescript
+// src/lib/cache/registry.ts
 let instance: CacheAdapter | null = null
 
 export function getCache(options?: CacheConfig): CacheAdapter {
@@ -193,27 +299,10 @@ export function getCache(options?: CacheConfig): CacheAdapter {
 }
 ```
 
-### Queue Registry (Named Instances)
+### Queue Registry (198 lines total)
 
 ```typescript
-import { getQueue, drainAllQueues, clearAllQueues } from './lib/queue'
-
-// Get or create a named queue
-const hashQueue = getQueue('hash', {
-  processor: async (text) => computeHash(text),
-  concurrency: 2
-})
-
-// Wait for all queues to finish processing
-await drainAllQueues()
-
-// Clear all queue instances (for tests)
-clearAllQueues()
-```
-
-**Internals:**
-
-```typescript
+// src/lib/queue/registry.ts
 const instances = new Map<string, QueueAdapter<unknown, unknown>>()
 
 export function getQueue<T, R>(name: string, config: QueueConfig<T, R>): QueueAdapter<T, R> {
@@ -258,35 +347,6 @@ case 'my-cache':
   instance = new MyCacheAdapter(config)
   break
 ```
-
-## Concurrency Model
-
-### Request Coalescing
-
-When multiple clients request the same computation simultaneously:
-- First request creates a work item and starts processing
-- Subsequent identical requests attach to the existing item's promise
-- All callers receive the same result from a single computation
-
-Result: 100 concurrent identical requests → 1 computation, 99 coalesced
-
-### Semaphore-Style Concurrency Control
-
-The `processing` Map limits concurrent workers:
-```typescript
-if (this.processing.size >= this.concurrency) return
-```
-
-### Node.js Event Loop Safety
-
-Operations between `await` points are atomic—no mutex needed for Map operations.
-
-## Cache Strategy
-
-**LRU (Least Recently Used)** cache with bounded memory:
-- O(1) lookup using JavaScript Map's insertion-order guarantee
-- Evicts oldest/least-recently-accessed when full
-- No TTL needed—SHA-256 results are immutable
 
 ## Configuration
 
@@ -355,69 +415,6 @@ QUEUE_TYPE=inngest \
 INNGEST_EVENT_KEY=your-event-key \
 INNGEST_SIGNING_KEY=your-signing-key \
 docker compose up --build
-```
-
-### Verification
-
-**Memory mode (default):**
-
-```bash
-npm run docker:up
-curl -X POST http://localhost:3000/chat \
-  -H "Content-Type: application/json" \
-  -d '{"text":"docker-test"}'
-curl http://localhost:3000/health
-npm run docker:down
-```
-
-**Redis mode:**
-
-```bash
-CACHE_TYPE=redis REDIS_URL=redis://:stub-redis-password@redis:6379 \
-  docker compose up --build -d
-
-curl -X POST http://localhost:3000/chat \
-  -H "Content-Type: application/json" \
-  -d '{"text":"redis-test"}'
-
-# Verify Redis key was created
-docker exec superq-redis-1 redis-cli -a stub-redis-password KEYS '*'
-
-docker compose down
-```
-
-## Example Requests
-
-### Cache Miss (First Request)
-
-```bash
-curl -w "\nTime: %{time_total}s\n" -X POST http://localhost:3000/chat \
-  -H "Content-Type: application/json" \
-  -d '{"text":"hello world"}'
-# Response after ~10s: {"fromCache":false, "processingTimeMs":10023}
-```
-
-### Cache Hit (Repeat Request)
-
-```bash
-curl -w "\nTime: %{time_total}s\n" -X POST http://localhost:3000/chat \
-  -H "Content-Type: application/json" \
-  -d '{"text":"hello world"}'
-# Response immediately: {"fromCache":true, "processingTimeMs":0.1}
-```
-
-### Request Coalescing
-
-```bash
-# Fire 10 concurrent requests for same text
-for i in {1..10}; do
-  curl -s -X POST http://localhost:3000/chat \
-    -H "Content-Type: application/json" \
-    -d '{"text":"coalesce-test"}' &
-done
-wait
-# All 10 complete in ~10s (not 100s)
-# Queue stats: coalesced: 9, totalEnqueued: 1
 ```
 
 ## Logging
