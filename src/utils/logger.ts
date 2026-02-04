@@ -19,7 +19,7 @@ function getLoggerOptions(): pino.LoggerOptions {
           translateTime: 'SYS:yyyy-mm-dd HH:MM:ss',
           ignore: 'hostname,pid',
           levelFirst: true,
-          singleLine: false,
+          singleLine: true,
         },
       },
     }
