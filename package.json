@@ -22,7 +22,7 @@
     "docker:health": "docker compose ps"
   },
   "engines": {
-    "node": ">=25.0.0"
+    "node": ">=22.0.0"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.9",

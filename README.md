@@ -15,7 +15,7 @@ npm install && npm run dev
 
 | Tool | Version | Notes |
 |------|---------|-------|
-| Node.js | >= 25.0.0 | Required for native test runner |
+| Node.js | >= 22.0.0 | Required for native test runner |
 | npm | >= 10.0.0 | Included with Node.js |
 | Docker | >= 27.0.0 | Optional, for containerized deployment |
 
@@ -23,14 +23,14 @@ npm install && npm run dev
 
 **macOS**
 ```bash
-brew install node@25
-# or use nvm: nvm install 25
+brew install node@22
+# or use nvm: nvm install 22
 brew install --cask docker
 ```
 
 **Linux (Ubuntu/Debian)**
 ```bash
-curl -fsSL https://deb.nodesource.com/setup_25.x | sudo -E bash -
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
 sudo apt-get install -y nodejs
 # Docker: https://docs.docker.com/engine/install/ubuntu/
 ```
@@ -236,8 +236,8 @@ npm run docker:health    # Check service health status
 
 ```
 tests 8 | pass 8 | fail 0
-Line coverage: 94.49%
-Branch coverage: 81.45%
+Line coverage: 91.34%
+Branch coverage: 80.16%
 ```
 
 See [`screenshots/test-results.md`](screenshots/test-results.md) for full output.
