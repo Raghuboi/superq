@@ -230,7 +230,7 @@ npm run docker:health    # Check service health status
 | Formatting | Prettier code formatting |
 | Type Safety | Strict TypeScript with Zod validation |
 | Structured Logging | Pino JSON logs with pretty-print dev mode |
-| Test Coverage | Node.js native test runner (94%+ coverage) |
+| Test Coverage | Node.js native test runner (91%+ line coverage) |
 
 ## Test Suite
 
