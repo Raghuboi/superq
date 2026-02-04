@@ -232,23 +232,38 @@ Result: 100 concurrent identical requests -> 1 computation, 99 coalesced
 
 ### Redis Cache (Docker)
 
-```bash
-CACHE_TYPE=redis REDIS_URL=redis://:stub-redis-password@redis:6379 \
-  docker compose up --build -d
+Enable Redis cache for distributed caching across multiple instances:
 
+```bash
+# Start with Redis cache enabled
+CACHE_TYPE=redis docker compose up --build -d
+
+# Test it works
 curl -X POST http://localhost:3000/chat \
   -H "Content-Type: application/json" \
   -d '{"text":"redis-test"}'
 
-docker exec redis redis-cli -a stub-redis-password KEYS '*'
+# Verify key stored in Redis
+docker exec redis redis-cli -a superq-redis-password KEYS '*'
 ```
 
 ### Inngest Queue (Docker)
 
+Enable Inngest for durable execution with exactly-once semantics:
+
 ```bash
-QUEUE_TYPE=inngest INNGEST_EVENT_KEY=key INNGEST_SIGNING_KEY=key \
-  docker compose up --build
-# Dev server: http://localhost:8288
+# Start with Inngest queue enabled
+QUEUE_TYPE=inngest docker compose up --build
+
+# Inngest Dev Server: http://localhost:8288
+# View events, functions, and run history in the dashboard
+```
+
+### Full Production Setup (Redis + Inngest)
+
+```bash
+# Enable both Redis cache and Inngest queue
+CACHE_TYPE=redis QUEUE_TYPE=inngest docker compose up --build -d
 ```
 
 ### Adding New Adapters (3 Steps)
@@ -267,9 +282,12 @@ QUEUE_TYPE=inngest INNGEST_EVENT_KEY=key INNGEST_SIGNING_KEY=key \
 | HOST | 0.0.0.0 | Server host |
 | PROCESSING_DELAY_MS | 10000 | Simulated delay |
 | CACHE_MAX_SIZE | 1000 | Max cache entries |
-| CACHE_TYPE | memory | Cache backend |
-| QUEUE_TYPE | memory | Queue backend |
+| CACHE_TYPE | memory | Cache backend (`memory` or `redis`) |
+| QUEUE_TYPE | memory | Queue backend (`memory` or `inngest`) |
 | QUEUE_CONCURRENCY | 1 | Concurrent workers |
+| REDIS_URL | - | Redis connection URL (required when `CACHE_TYPE=redis`) |
+| INNGEST_EVENT_KEY | - | Inngest event key (required when `QUEUE_TYPE=inngest`) |
+| INNGEST_SIGNING_KEY | - | Inngest signing key (required when `QUEUE_TYPE=inngest`) |
 
 ---
 
@@ -278,8 +296,10 @@ QUEUE_TYPE=inngest INNGEST_EVENT_KEY=key INNGEST_SIGNING_KEY=key \
 | Service | Port | Description |
 |---------|------|-------------|
 | `backend` | 3000 | Node.js API server |
-| `redis` | 6379 | Redis (stub password) |
-| `inngest` | 8288 | Inngest dev server |
+| `redis` | 6379 | Redis cache (password: `superq-redis-password`) |
+| `inngest` | 8288 | Inngest dev server dashboard |
+
+> **Note**: By default, Docker starts all services but uses memory-based adapters. Set `CACHE_TYPE=redis` and/or `QUEUE_TYPE=inngest` to enable the external services.
 
 ---
 
