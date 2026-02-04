@@ -74,12 +74,18 @@ export class ChatRepository {
    */
   private async computeAndStore(item: WorkItem): Promise<WorkResult> {
     const start = performance.now()
+
+    logger.info(
+      { requestId: item.requestId, text: item.text, delayMs: this.delayMs },
+      'processing.start'
+    )
+
     await setTimeout(this.delayMs)
     const hash = createHash('sha256').update(item.text).digest('hex')
     await this.cache.set(item.text, hash)
     const processingTimeMs = performance.now() - start
     logger.info(
-      { requestId: item.requestId, processingTimeMs, text: item.text },
+      { requestId: item.requestId, processingTimeMs, text: item.text, hash },
       'processing.complete'
     )
     return { hash, processingTimeMs }

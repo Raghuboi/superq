@@ -33,7 +33,7 @@ export class MemoryCache implements CacheAdapter {
       return Promise.resolve(null)
     }
     this._hits++
-    logger.info({ key }, 'cache.hit')
+    logger.info({ key, hash: entry }, 'cache.hit')
     this.data.delete(key)
     this.data.set(key, entry)
     return Promise.resolve(entry)
@@ -52,6 +52,7 @@ export class MemoryCache implements CacheAdapter {
       const oldest = this.data.keys().next().value
       if (oldest) this.data.delete(oldest)
     }
+    logger.info({ key, hash: value }, 'cache.set')
     return Promise.resolve()
   }
 

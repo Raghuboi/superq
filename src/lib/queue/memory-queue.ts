@@ -111,6 +111,9 @@ export class MemoryQueue<T, R> implements QueueAdapter<T, R> {
     item.startedAt = Date.now()
     this.processing.set(item.id, item)
 
+    const queueWaitMs = item.startedAt - item.enqueuedAt
+    logger.info({ id: item.id, queueWaitMs }, 'queue.processing.start')
+
     this.processor(item.data)
       .then((result) => {
         item.status = 'completed'

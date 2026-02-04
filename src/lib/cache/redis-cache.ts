@@ -63,10 +63,10 @@ export class RedisCache implements CacheAdapter {
     const value = await this.client.get(key)
     if (value !== null) {
       this._hits++
-      logger.debug({ key }, 'cache.hit')
+      logger.info({ key, hash: value }, 'cache.hit')
     } else {
       this._misses++
-      logger.debug({ key }, 'cache.miss')
+      logger.info({ key }, 'cache.miss')
     }
     return value
   }
@@ -79,7 +79,7 @@ export class RedisCache implements CacheAdapter {
    */
   async set(key: string, value: string): Promise<void> {
     await this.client.set(key, value)
-    logger.debug({ key }, 'cache.set')
+    logger.info({ key, hash: value }, 'cache.set')
   }
 
   /**

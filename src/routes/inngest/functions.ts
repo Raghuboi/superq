@@ -38,7 +38,7 @@ function getHashFunction(): InngestFunction.Any {
       const { text, requestId } = data
       const start = performance.now()
 
-      logger.info({ requestId, text }, 'inngest_function.started')
+      logger.info({ requestId, text, delayMs: env.processingDelayMs }, 'inngest_function.started')
 
       // Simulate processing delay
       await setTimeout(env.processingDelayMs)
@@ -52,7 +52,7 @@ function getHashFunction(): InngestFunction.Any {
 
       const processingTimeMs = performance.now() - start
 
-      logger.info({ requestId, processingTimeMs }, 'inngest_function.completed')
+      logger.info({ requestId, processingTimeMs, text, hash }, 'inngest_function.completed')
 
       return { hash, processingTimeMs }
     }
