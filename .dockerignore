@@ -1,0 +1,12 @@
+node_modules
+dist
+.git
+.gitignore
+.env*
+!.env.example
+*.md
+*.log
+coverage
+__tmp__
+.claude
+.mcp*

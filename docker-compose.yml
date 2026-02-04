@@ -1,0 +1,117 @@
+name: superq
+
+networks:
+  superq:
+    driver: bridge
+
+volumes:
+  superq-redis-data:
+    driver: local
+
+x-common-config: &common-config
+  restart: unless-stopped
+  networks:
+    - superq
+
+x-logging: &logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-redis-config: &redis-config
+  image: redis:7-alpine
+  command: >
+    sh -c '
+    if [ -n "${REDIS_PASSWORD:-}" ]; then
+      redis-server --requirepass ${REDIS_PASSWORD} --appendonly yes --appendfsync everysec
+    else
+      redis-server --appendonly yes --appendfsync everysec
+    fi
+    '
+  environment:
+    REDIS_PASSWORD: "stub-redis-password"
+  healthcheck:
+    test: ["CMD", "sh", "-c", "redis-cli -a ${REDIS_PASSWORD} ping"]
+    interval: 10s
+    timeout: 3s
+    retries: 5
+  <<: *common-config
+  logging: *logging
+
+x-inngest-config: &inngest-config
+  image: inngest/inngest:latest
+  healthcheck:
+    test: ["CMD", "curl", "-f", "http://localhost:8288/health"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 40s
+  <<: *common-config
+  logging: *logging
+
+services:
+  app:
+    build:
+      context: .
+      target: production
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOST: 0.0.0.0
+      PROCESSING_DELAY_MS: 10000
+      CACHE_MAX_SIZE: 1000
+      CACHE_TYPE: memory
+      QUEUE_TYPE: memory
+      QUEUE_CONCURRENCY: 1
+      REDIS_URL: redis://:stub-redis-password@redis:6379
+      INNGEST_EVENT_KEY: stub-inngest-event-key
+      INNGEST_SIGNING_KEY: stub-inngest-signing-key
+    depends_on:
+      redis:
+        condition: service_healthy
+      inngest:
+        condition: service_healthy
+    develop:
+      watch:
+        - action: sync
+          path: ./src
+          target: /app/src
+          ignore:
+            - node_modules/
+            - dist/
+        - action: sync
+          path: ./__tests__
+          target: /app/__tests__
+          ignore:
+            - node_modules/
+            - dist/
+        - action: rebuild
+          path: ./package.json
+        - action: rebuild
+          path: ./package-lock.json
+        - action: rebuild
+          path: ./Dockerfile
+    <<: *common-config
+    logging: *logging
+
+  redis:
+    <<: *redis-config
+    ports:
+      - "6379:6379"
+    volumes:
+      - superq-redis-data:/data
+
+  inngest:
+    <<: *inngest-config
+    ports:
+      - "8288:8288"
+    environment:
+      INNGEST_EVENT_KEY: stub-inngest-event-key
+      INNGEST_SIGNING_KEY: stub-inngest-signing-key
+      REDIS_URL: redis://:stub-redis-password@redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy

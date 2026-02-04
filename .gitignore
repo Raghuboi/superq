@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.env
+.env.local
+.env.*.local
+!.env.example
+*.log
+coverage/
+__tmp__/
+.DS_Store
+.claude/
+.mcp.json
+opencode.json
