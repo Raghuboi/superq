@@ -9,6 +9,7 @@ import { drainAllQueues } from './lib/queue/index.js'
 import { API_METADATA } from './lib/constants.js'
 import { env } from './lib/env.js'
 import { logger } from './utils/logger.js'
+import { createInngestHandler } from './routes/inngest/index.js'
 
 /**
  * Create the application instance with all routes and middleware.
@@ -40,6 +41,13 @@ export function createApp(): { app: OpenAPIHono; shutdown: () => Promise<void> }
 
   app.route('/chat', createChatController(chatService))
   app.route('/health', createHealthController(chatService, startTime))
+
+  // Inngest webhook handler (only registered when QUEUE_TYPE=inngest)
+  if (env.queueType === 'inngest') {
+    const inngestHandler = createInngestHandler()
+    app.on(['GET', 'POST', 'PUT'], '/api/inngest', (c) => inngestHandler(c))
+    logger.info('inngest.route_registered')
+  }
 
   app.doc(API_METADATA.OPENAPI_PATH, {
     openapi: API_METADATA.OPENAPI_VERSION,
