@@ -39,28 +39,24 @@ describe('[Batch 3] Stress Integration', () => {
     await shutdown()
   })
 
-  it(
-    'coalesces a large batch of identical inputs',
-    { timeout: TEST_TIMEOUT_MS },
-    async () => {
-      const text = 'stress-coalesce'
+  it('coalesces a large batch of identical inputs', { timeout: TEST_TIMEOUT_MS }, async () => {
+    const text = 'stress-coalesce'
 
-      logger.debug({ batchSize: STRESS_BATCH_SIZE, text }, 'test.coalesce.start')
-      const responses = await Promise.all(
-        Array.from({ length: STRESS_BATCH_SIZE }, () => sendChat(app, text))
-      )
-      logger.debug({ batchSize: STRESS_BATCH_SIZE, text }, 'test.coalesce.complete')
+    logger.debug({ batchSize: STRESS_BATCH_SIZE, text }, 'test.coalesce.start')
+    const responses = await Promise.all(
+      Array.from({ length: STRESS_BATCH_SIZE }, () => sendChat(app, text))
+    )
+    logger.debug({ batchSize: STRESS_BATCH_SIZE, text }, 'test.coalesce.complete')
 
-      const expectedHash = createHash('sha256').update(text).digest('hex')
-      responses.forEach((body) => {
-        const response = body as ChatResponse
-        assertOkResponse(response)
-        assert.equal(response.data?.hash, expectedHash)
-        assert.ok(response.data?.processingTimeMs && response.data.processingTimeMs >= DELAY_MS)
-      })
+    const expectedHash = createHash('sha256').update(text).digest('hex')
+    responses.forEach((body) => {
+      const response = body as ChatResponse
+      assertOkResponse(response)
+      assert.equal(response.data?.hash, expectedHash)
+      assert.ok(response.data?.processingTimeMs && response.data.processingTimeMs >= DELAY_MS)
+    })
 
-      assert.equal(service.stats.totalEnqueued, 1)
-      assert.equal(service.stats.coalesced, STRESS_BATCH_SIZE - 1)
-    }
-  )
+    assert.equal(service.stats.totalEnqueued, 1)
+    assert.equal(service.stats.coalesced, STRESS_BATCH_SIZE - 1)
+  })
 })

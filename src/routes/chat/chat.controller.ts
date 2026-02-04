@@ -62,8 +62,14 @@ export function createChatController(service: ChatService): OpenAPIHono {
         content: { 'application/json': { schema: ChatResponseSchema } },
         description: 'Message processed',
       },
-      400: { content: { 'application/json': { schema: ErrorSchema } }, description: 'Invalid request' },
-      500: { content: { 'application/json': { schema: ErrorSchema } }, description: 'Server error' },
+      400: {
+        content: { 'application/json': { schema: ErrorSchema } },
+        description: 'Invalid request',
+      },
+      500: {
+        content: { 'application/json': { schema: ErrorSchema } },
+        description: 'Server error',
+      },
     },
   })
 

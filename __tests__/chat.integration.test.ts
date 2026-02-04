@@ -32,96 +32,94 @@ describe('[Batch 4] Chat Integration', () => {
     await shutdown()
   })
 
-  it(
-    'returns a hash and caches subsequent requests',
-    { timeout: TEST_TIMEOUT_MS },
-    async () => {
-      const text = 'cache-test'
+  it('returns a hash and caches subsequent requests', { timeout: TEST_TIMEOUT_MS }, async () => {
+    const text = 'cache-test'
 
-      logger.debug({ text }, 'test.cache.miss')
-      const response = await app.request('/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
-      })
+    logger.debug({ text }, 'test.cache.miss')
+    const response = await app.request('/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    })
 
-      assert.equal(response.status, 200)
-      const first = (await response.json()) as ChatResponse
+    assert.equal(response.status, 200)
+    const first = (await response.json()) as ChatResponse
 
-      logger.debug({ text }, 'test.cache.hit')
-      const cachedResponse = await app.request('/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
-      })
+    logger.debug({ text }, 'test.cache.hit')
+    const cachedResponse = await app.request('/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    })
 
-      const cached = (await cachedResponse.json()) as ChatResponse
-      assertOkResponse(first)
-      assertOkResponse(cached)
-      assert.equal(first.data?.fromCache, false)
-      assert.equal(cached.data?.fromCache, true)
-      assert.equal(first.data?.hash, cached.data?.hash)
-      assert.ok(first.data?.processingTimeMs && first.data.processingTimeMs >= DELAY_MS)
-      assert.ok(cached.data?.processingTimeMs !== undefined && cached.data.processingTimeMs <= CACHE_HIT_MS)
-    }
-  )
+    const cached = (await cachedResponse.json()) as ChatResponse
+    assertOkResponse(first)
+    assertOkResponse(cached)
+    assert.equal(first.data?.fromCache, false)
+    assert.equal(cached.data?.fromCache, true)
+    assert.equal(first.data?.hash, cached.data?.hash)
+    assert.ok(first.data?.processingTimeMs && first.data.processingTimeMs >= DELAY_MS)
+    assert.ok(
+      cached.data?.processingTimeMs !== undefined && cached.data.processingTimeMs <= CACHE_HIT_MS
+    )
+  })
 
-  it(
-    'coalesces concurrent requests for the same text',
-    { timeout: TEST_TIMEOUT_MS },
-    async () => {
-      const text = 'coalesce-test'
-      const expectedHash = createHash('sha256').update(text).digest('hex')
+  it('coalesces concurrent requests for the same text', { timeout: TEST_TIMEOUT_MS }, async () => {
+    const text = 'coalesce-test'
+    const expectedHash = createHash('sha256').update(text).digest('hex')
 
-      logger.debug({ text, batchSize: COALESCE_BATCH_SIZE }, 'test.coalesce.start')
-      const requests = Array.from({ length: COALESCE_BATCH_SIZE }, () =>
+    logger.debug({ text, batchSize: COALESCE_BATCH_SIZE }, 'test.coalesce.start')
+    const requests: Promise<Response>[] = Array.from({ length: COALESCE_BATCH_SIZE }, () =>
+      Promise.resolve(
         app.request('/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ text }),
         })
       )
+    )
 
-      const responses = await Promise.all(requests)
-      const bodies = (await Promise.all(responses.map((res) => res.json()))) as ChatResponse[]
-      logger.debug({ text }, 'test.coalesce.complete')
+    const responses = await Promise.all(requests)
+    const bodies = (await Promise.all(responses.map((res) => res.json()))) as ChatResponse[]
+    logger.debug({ text }, 'test.coalesce.complete')
 
-      assert.ok(bodies.every((body) => body.data?.hash === expectedHash))
-      const processingTimes = bodies.map((body) => body.data?.processingTimeMs ?? 0)
-      const maxProcessingTime = Math.max(...processingTimes)
-      assert.ok(maxProcessingTime >= DELAY_MS - TIMER_TOLERANCE_MS)
-      assert.equal(service.stats.totalEnqueued, 1)
-      assert.equal(service.stats.coalesced, COALESCE_BATCH_SIZE - 1)
-    }
-  )
+    assert.ok(bodies.every((body) => body.data?.hash === expectedHash))
+    const processingTimes = bodies.map((body) => body.data?.processingTimeMs ?? 0)
+    const maxProcessingTime = Math.max(...processingTimes)
+    assert.ok(maxProcessingTime >= DELAY_MS - TIMER_TOLERANCE_MS)
+    assert.equal(service.stats.totalEnqueued, 1)
+    assert.equal(service.stats.coalesced, COALESCE_BATCH_SIZE - 1)
+  })
 
-  it(
-    'processes multiple unique texts concurrently',
-    { timeout: TEST_TIMEOUT_MS },
-    async () => {
-      const texts = ['alpha', 'beta', 'gamma']
-      logger.debug({ count: texts.length }, 'test.unique.start')
-      const requests = texts.map((text) =>
+  it('processes multiple unique texts concurrently', { timeout: TEST_TIMEOUT_MS }, async () => {
+    const texts = ['alpha', 'beta', 'gamma']
+    logger.debug({ count: texts.length }, 'test.unique.start')
+    const requests: Promise<Response>[] = texts.map((text) =>
+      Promise.resolve(
         app.request('/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ text }),
         })
       )
+    )
 
-      const responses = await Promise.all(requests)
-      const bodies = (await Promise.all(responses.map((res) => res.json()))) as ChatResponse[]
-      logger.debug({ count: texts.length }, 'test.unique.complete')
+    const responses = await Promise.all(requests)
+    const bodies = (await Promise.all(responses.map((res) => res.json()))) as ChatResponse[]
+    logger.debug({ count: texts.length }, 'test.unique.complete')
 
-      const hashes = bodies.map((body, index) => {
-        const expected = createHash('sha256').update(texts[index] ?? '').digest('hex')
-        return body.data?.hash === expected
-      })
+    const hashes = bodies.map((body, index) => {
+      const expected = createHash('sha256')
+        .update(texts[index] ?? '')
+        .digest('hex')
+      return body.data?.hash === expected
+    })
 
-      assert.ok(hashes.every(Boolean))
-      // Allow tolerance for timer imprecision under concurrent load
-      assert.ok(bodies.every((body) => (body.data?.processingTimeMs ?? 0) >= DELAY_MS - TIMER_TOLERANCE_MS))
-      assert.equal(service.stats.totalEnqueued, texts.length)
-    }
-  )
+    assert.ok(hashes.every(Boolean))
+    // Allow tolerance for timer imprecision under concurrent load
+    assert.ok(
+      bodies.every((body) => (body.data?.processingTimeMs ?? 0) >= DELAY_MS - TIMER_TOLERANCE_MS)
+    )
+    assert.equal(service.stats.totalEnqueued, texts.length)
+  })
 })

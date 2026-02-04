@@ -28,9 +28,9 @@ services:
       HOST: 0.0.0.0
       PROCESSING_DELAY_MS: 10000
       CACHE_MAX_SIZE: 1000
-      CACHE_TYPE: redis
+      CACHE_TYPE: memory
       QUEUE_TYPE: inngest
-      QUEUE_CONCURRENCY: 1
+      QUEUE_CONCURRENCY: 5
       REDIS_URL: redis://:stub-redis-password@redis:6379
       INNGEST_EVENT_KEY: stub-inngest-event-key
       INNGEST_SIGNING_KEY: stub-inngest-signing-key

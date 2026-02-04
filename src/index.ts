@@ -28,10 +28,10 @@ serve({ fetch: app.fetch, port: env.port, hostname: env.host }, (info) => {
       nodeEnv: env.nodeEnv,
       docs: `http://${env.host}:${String(info.port)}${API_METADATA.DOCS_PATH}`,
       openapi: `http://${env.host}:${String(info.port)}${API_METADATA.OPENAPI_PATH}`,
-        cache: {
-          type: env.cacheType,
-          maxSize: env.cacheMaxSize,
-        },
+      cache: {
+        type: env.cacheType,
+        maxSize: env.cacheMaxSize,
+      },
 
       queue: {
         type: env.queueType,

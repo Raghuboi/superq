@@ -37,7 +37,9 @@ if (parsedEnv.CACHE_TYPE === 'redis' && !parsedEnv.REDIS_URL) {
 
 if (parsedEnv.QUEUE_TYPE === 'inngest') {
   if (!parsedEnv.INNGEST_EVENT_KEY || !parsedEnv.INNGEST_SIGNING_KEY) {
-    throw new Error('INNGEST_EVENT_KEY and INNGEST_SIGNING_KEY are required when QUEUE_TYPE=inngest')
+    throw new Error(
+      'INNGEST_EVENT_KEY and INNGEST_SIGNING_KEY are required when QUEUE_TYPE=inngest'
+    )
   }
 }
 

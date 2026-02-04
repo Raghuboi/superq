@@ -78,7 +78,10 @@ export class ChatRepository {
     const hash = createHash('sha256').update(item.text).digest('hex')
     await this.cache.set(item.text, hash)
     const processingTimeMs = performance.now() - start
-    logger.info({ requestId: item.requestId, processingTimeMs, text: item.text }, 'processing.complete')
+    logger.info(
+      { requestId: item.requestId, processingTimeMs, text: item.text },
+      'processing.complete'
+    )
     return { hash, processingTimeMs }
   }
 

@@ -21,52 +21,40 @@ describe('[Batch 1] Contract Integration', () => {
     await shutdown()
   })
 
-  it(
-    'rejects invalid payloads with error envelope',
-    { timeout: TEST_TIMEOUT_MS },
-    async () => {
-      const response = await app.request('/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      })
+  it('rejects invalid payloads with error envelope', { timeout: TEST_TIMEOUT_MS }, async () => {
+    const response = await app.request('/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    })
 
-      assert.equal(response.status, 400)
-      const body = (await response.json()) as ErrorResponse
-      assertErrResponse(body)
-      assert.equal(body.error?.code, 'BAD_REQUEST')
-    }
-  )
+    assert.equal(response.status, 400)
+    const body = (await response.json()) as ErrorResponse
+    assertErrResponse(body)
+    assert.equal(body.error?.code, 'BAD_REQUEST')
+  })
 
-  it(
-    'rejects empty text',
-    { timeout: TEST_TIMEOUT_MS },
-    async () => {
-      const response = await app.request('/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: '' }),
-      })
+  it('rejects empty text', { timeout: TEST_TIMEOUT_MS }, async () => {
+    const response = await app.request('/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: '' }),
+    })
 
-      assert.equal(response.status, 400)
-      const body = (await response.json()) as ErrorResponse
-      assertErrResponse(body)
-    }
-  )
+    assert.equal(response.status, 400)
+    const body = (await response.json()) as ErrorResponse
+    assertErrResponse(body)
+  })
 
-  it(
-    'rejects text exceeding max length',
-    { timeout: TEST_TIMEOUT_MS },
-    async () => {
-      const response = await app.request('/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: 'x'.repeat(10_001) }),
-      })
+  it('rejects text exceeding max length', { timeout: TEST_TIMEOUT_MS }, async () => {
+    const response = await app.request('/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: 'x'.repeat(10_001) }),
+    })
 
-      assert.equal(response.status, 400)
-      const body = (await response.json()) as ErrorResponse
-      assertErrResponse(body)
-    }
-  )
+    assert.equal(response.status, 400)
+    const body = (await response.json()) as ErrorResponse
+    assertErrResponse(body)
+  })
 })

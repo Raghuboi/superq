@@ -3,9 +3,9 @@ import assert from 'node:assert/strict'
 /**
  * Assert that a response has the correct success envelope format.
  */
-export function assertOkResponse<T>(body: unknown): asserts body is {
+export function assertOkResponse(body: unknown): asserts body is {
   readonly success: true
-  readonly data: T
+  readonly data: unknown
 } {
   if (typeof body !== 'object' || body === null) {
     throw new Error('Response body is not an object')

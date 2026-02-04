@@ -18,6 +18,9 @@ export function ok<TData, TMeta = undefined>(data: TData, meta?: TMeta): OkRespo
 }
 
 /** Create an error envelope. */
-export function err<TError, TMeta = undefined>(error: TError, meta?: TMeta): ErrResponse<TError, TMeta> {
+export function err<TError, TMeta = undefined>(
+  error: TError,
+  meta?: TMeta
+): ErrResponse<TError, TMeta> {
   return meta ? { success: false, error, meta } : { success: false, error }
 }
