@@ -1,6 +1,6 @@
 import { serve } from 'inngest/hono'
 import { getInngestClient } from '../../lib/queue/inngest-queue.js'
-import { inngestFunctions } from './functions.js'
+import { getInngestFunctions } from './functions.js'
 
 /**
  * Inngest HTTP handler for Hono.
@@ -12,6 +12,6 @@ import { inngestFunctions } from './functions.js'
 export function createInngestHandler(): ReturnType<typeof serve> {
   return serve({
     client: getInngestClient(),
-    functions: inngestFunctions,
+    functions: getInngestFunctions(),
   })
 }

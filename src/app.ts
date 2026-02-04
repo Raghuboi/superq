@@ -9,14 +9,13 @@ import { drainAllQueues } from './lib/queue/index.js'
 import { API_METADATA } from './lib/constants.js'
 import { env } from './lib/env.js'
 import { logger } from './utils/logger.js'
-import { createInngestHandler } from './routes/inngest/index.js'
 
 /**
  * Create the application instance with all routes and middleware.
  *
  * @returns The Hono app and a shutdown function for graceful cleanup.
  */
-export function createApp(): { app: OpenAPIHono; shutdown: () => Promise<void> } {
+export async function createApp(): Promise<{ app: OpenAPIHono; shutdown: () => Promise<void> }> {
   const app = new OpenAPIHono()
   const startTime = Date.now()
 
@@ -42,8 +41,9 @@ export function createApp(): { app: OpenAPIHono; shutdown: () => Promise<void> }
   app.route('/chat', createChatController(chatService))
   app.route('/health', createHealthController(chatService, startTime))
 
-  // Inngest webhook handler (only registered when QUEUE_TYPE=inngest)
+  // Inngest webhook handler (only loaded when QUEUE_TYPE=inngest)
   if (env.queueType === 'inngest') {
+    const { createInngestHandler } = await import('./routes/inngest/index.js')
     const inngestHandler = createInngestHandler()
     app.on(['GET', 'POST', 'PUT'], '/api/inngest', (c) => inngestHandler(c))
     logger.info('inngest.route_registered')

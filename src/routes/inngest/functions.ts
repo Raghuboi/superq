@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { setTimeout } from 'node:timers/promises'
+import type { InngestFunction } from 'inngest'
 import { getInngestClient } from '../../lib/queue/inngest-queue.js'
 import { getCache } from '../../lib/cache/index.js'
 import { env } from '../../lib/env.js'
@@ -10,45 +11,62 @@ type HashEventData = {
   requestId: string
 }
 
+let _hashFunction: InngestFunction.Any | null = null
+
 /**
- * Inngest function for computing SHA-256 hashes.
+ * Get or create the hash function.
  *
- * This function runs in Inngest's durable execution environment,
- * providing exactly-once semantics and automatic retries.
+ * Lazily initializes the Inngest function to avoid errors
+ * when INNGEST_EVENT_KEY is not set.
  */
-export const hashFunction = getInngestClient().createFunction(
-  {
-    id: 'compute-hash',
-    name: 'Compute SHA-256 Hash',
-    concurrency: {
-      limit: env.queueConcurrency,
+function getHashFunction(): InngestFunction.Any {
+  if (_hashFunction) return _hashFunction
+
+  _hashFunction = getInngestClient().createFunction(
+    {
+      id: 'compute-hash',
+      name: 'Compute SHA-256 Hash',
+      concurrency: {
+        limit: env.queueConcurrency,
+      },
+      retries: 3,
     },
-    retries: 3,
-  },
-  { event: 'superq/chat' },
-  async ({ event }) => {
-    const { text, requestId } = event.data as HashEventData
-    const start = performance.now()
+    { event: 'superq/chat' },
+    async ({ event, step: _step }) => {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      const data = event.data as HashEventData
+      const { text, requestId } = data
+      const start = performance.now()
 
-    logger.info({ requestId, text }, 'inngest_function.started')
+      logger.info({ requestId, text }, 'inngest_function.started')
 
-    // Simulate processing delay
-    await setTimeout(env.processingDelayMs)
+      // Simulate processing delay
+      await setTimeout(env.processingDelayMs)
 
-    // Compute hash
-    const hash = createHash('sha256').update(text).digest('hex')
+      // Compute hash
+      const hash = createHash('sha256').update(text).digest('hex')
 
-    // Store in cache
-    const cache = getCache()
-    await cache.set(text, hash)
+      // Store in cache
+      const cache = getCache()
+      await cache.set(text, hash)
 
-    const processingTimeMs = performance.now() - start
+      const processingTimeMs = performance.now() - start
 
-    logger.info({ requestId, processingTimeMs }, 'inngest_function.completed')
+      logger.info({ requestId, processingTimeMs }, 'inngest_function.completed')
 
-    return { hash, processingTimeMs }
-  }
-)
+      return { hash, processingTimeMs }
+    }
+  )
 
-/** All Inngest functions for this application. */
-export const inngestFunctions = [hashFunction]
+  return _hashFunction
+}
+
+/**
+ * Get all Inngest functions for this application.
+ *
+ * Lazily initializes functions to avoid errors when Inngest
+ * environment variables are not configured.
+ */
+export function getInngestFunctions(): InngestFunction.Any[] {
+  return [getHashFunction()]
+}
